@@ -89,7 +89,7 @@ clip_category_prompt = "The last detected category up until this message was "
 # Core Backend Calling
 # -----------------------------------------------------------------------------
 
-def generate_initial_recommendations(img_path: str | None, prompt: str | None) -> Tuple[List[Product], str]:
+def generate_initial_recommendations(img_path: str | None) -> Tuple[List[Product], str]:
     image = Image.open(img_path).copy()
 
     clipmlp_category, clip_feat = my_clipmlp.classify_image_clipmlp(image)
@@ -101,7 +101,7 @@ def generate_initial_recommendations(img_path: str | None, prompt: str | None) -
     
     myLLM.create_new_chat()
     myLLM.clipcategory = clipmlp_category
-    llm_response = myLLM.query_chat(beginning_llm_prompt+prompt, image)
+    llm_response = myLLM.query_chat(beginning_llm_prompt, image)
 
     return prods, llm_response
 
@@ -147,7 +147,6 @@ def launch_app():
             with gr.Column(scale=3):
                 gr.Markdown("### 1️⃣  Upload")
                 img_in = gr.Image(type="filepath", label="Inspiration")
-                prompt_in = gr.Textbox(label="Note (optional)")
                 sub_btn = gr.Button("Get recommendations", variant="primary")
 
                 gr.Markdown("### 2️⃣  Chat")
@@ -169,26 +168,47 @@ def launch_app():
                     gr.Button("Buy now 💳", variant="primary")
 
         # ---- Callbacks -------------------------------------------------------
-        def _submit(img, prompt, hist):
-            prods, reply = generate_initial_recommendations(img, prompt)
+        def _submit(img, hist):
+            prods, reply = generate_initial_recommendations(img)
             hist = hist or []
-            hist.append((prompt or "", reply))
-            return hist, [p.image for p in prods], hist, prods, "", gr.update(visible=False)
+            hist.append(("", reply))                    # first user turn had no text
+            return (hist,                               # chat
+                    [p.image for p in prods],           # gallery images
+                    hist,                               # update hidden state
+                    prods,                              # products in state
+                    gr.update(visible=False))           # hide details box
 
-        sub_btn.click(_submit,
-            inputs=[img_in, prompt_in, chat_hist],
-            outputs=[chat, gallery, chat_hist, prod_state, prompt_in, detail_box])
+        sub_btn.click(
+            _submit,
+            inputs=[img_in, chat_hist],
+            outputs=[chat, gallery, chat_hist, prod_state, detail_box],
+        )
 
         def _chat(msg, hist, prods):
             if not msg:
-                return gr.update(), gr.update(), hist, prods, "", gr.update()
+                # nothing typed ⇒ leave box as-is
+                return (gr.update(),              # chat
+                        gr.update(),              # gallery
+                        hist,                     # state unchanged
+                        prods,                    # …
+                        gr.update(),              # leave textbox
+                        gr.update())              # detail box
+
             new_p, reply = refine_recommendations(msg, hist, prods)
             hist.append((msg, reply))
-            return hist, [p.image for p in new_p], hist, new_p, "", gr.update(visible=False)
+            return (hist,                         # updated chat
+                    [p.image for p in new_p],     # new gallery imgs
+                    hist,                         # store chat state
+                    new_p,                        # store product state
+                    "",                           # <-- clear textbox here
+                    gr.update(visible=False))     # hide detail box
 
-        user_txt.submit(_chat,
+
+        user_txt.submit(
+            _chat,
             inputs=[user_txt, chat_hist, prod_state],
-            outputs=[chat, gallery, chat_hist, prod_state, user_txt, detail_box])
+            outputs=[chat, gallery, chat_hist, prod_state, user_txt, detail_box],
+        )
 
         def _show(evt: gr.SelectData, prods: List[Product]):
             idx = evt.index if evt else None
