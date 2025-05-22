@@ -1,0 +1,13 @@
+google-genai
+clip-interrogator
+openai-clip
+pillow
+requests
+tqdm
+aiohttp
+aiofiles
+faiss-cpu
+python-dotenv
+torch
+numpy
+scikit-learn

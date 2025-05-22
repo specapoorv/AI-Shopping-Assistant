@@ -1,0 +1,159 @@
+# gradio_personal_shopper_ui.py  ── v5: min-height 0 fix + 100% gallery height
+"""Gradio UI – **final layout fix** for the gallery not stretching all the way down.
+
+Root cause
+~~~~~~~~~~
+When a flex column contains a flex child *and* other siblings (our heading and
+hidden detail pane), the child must have **`min-height: 0`** (or `overflow`
+set) to be allowed to shrink/grow within the remaining space; otherwise many
+browsers keep its intrinsic height (fit-content) and the rest of the column
+shows blank.
+
+Fixes in this version
+=====================
+1. `#product_gallery` now gets `flex: 1 1 auto; min-height: 0; overflow-y: auto;`.
+2. Explicit `height="100%"` passed to `gr.Gallery` so its wrapper also expands.
+3. Slightly smaller default thumbnail size (256×256) so two rows fit on most
+   laptop screens (tweak via `item_size` if desired).
+
+No Python callback changes – just drop-in replacement.
+"""
+
+# External Packages:
+from __future__ import annotations
+import gradio as gr
+import os
+from dataclasses import dataclass
+from typing import List, Tuple, Union
+from PIL import Image
+
+# Importing from our various other files:
+import my_clipmlp
+import llm
+
+
+beginning_llm_prompt = """You are a friendly personal shopping assistant. You have just been shown an image of a product the user likes. 
+
+1. Start by briefly describing what you see in the image (e.g. category, color, key style elements).  
+2. Then invite the user to share any extra preferences or context so you can refine your suggestions.  
+3. Ask about things like their preferred styles, colors, sizes, brands, occasions, or budget limits.  
+4. Keep your tone warm, conversational, and helpful—imagine you're a personal stylist in a boutique.  
+
+Example output:
+“Nice choice! I see a pair of black leather ankle boots with a pointed toe and block heel. Do you have a favorite brand or heel height? Or perhaps a color or material you’d like to explore next? Let me know your budget and any style details (like casual vs. dressy), and I'll pull up some perfect matches for you!”
+"""
+
+# -----------------------------------------------------------------------------
+# 📦  Product model
+# -----------------------------------------------------------------------------
+
+LocalImg = Union[str, Image.Image]
+
+@dataclass
+class Product:
+    image: LocalImg
+    price: str
+    name: str = ""
+
+# -----------------------------------------------------------------------------
+# ✨  Stub functions  – replace with real logic
+# -----------------------------------------------------------------------------
+
+def generate_initial_recommendations(img_path: str | None, prompt: str | None) -> Tuple[List[Product], str]:
+    image = Image.open(img_path).copy()
+
+    clipmlp_category, clip_feat = my_clipmlp.classify_image_clipmlp(image)
+    top8 = my_clipmlp.clip_find_top_k_similar_in_category(f"shoe_features\\{clipmlp_category}", clip_feat)
+
+    llm_response = llm.get_llm_response(beginning_llm_prompt, image)
+
+    prods = []
+    for rank, (p, sim) in enumerate(top8, start=1):
+        print(f"{rank:2d}. {os.path.basename(p)} — cosine sim: {sim:.4f}")
+        product_price = "₹1,000"
+        prods.append(Product(Image.open(f"shoes\\{clipmlp_category}\\{os.path.basename(p)[:-4]}.jpg"), product_price))
+    return prods, llm_response
+
+
+def refine_recommendations(msg: str, hist: List[Tuple[str, str]], prods: List[Product]) -> Tuple[List[Product], str]:
+    return prods[::-1], "Re-ordered as requested."
+
+# -----------------------------------------------------------------------------
+# 🎨  UI
+# -----------------------------------------------------------------------------
+
+def launch_app():
+    CSS = """
+    html, body, .gr-app {height:100%; margin:0}
+    .top-row {height:100%; align-items:stretch;}  /* columns share height */
+    .gr-block {margin-bottom:0}
+    #rhs_col {display:flex; flex-direction:column; flex:1 1 auto; }
+    #product_gallery {flex:1 1 auto; min-height:0; overflow-y:auto; max-height: 500px;}
+    """
+
+    with gr.Blocks(css=CSS) as demo:
+        chat_hist = gr.State([])
+        prod_state = gr.State([])
+
+        with gr.Row(elem_classes=["top-row"]):
+            # Left column ------------------------------------------------------
+            with gr.Column(scale=3):
+                gr.Markdown("### 1️⃣  Upload")
+                img_in = gr.Image(type="filepath", label="Inspiration")
+                prompt_in = gr.Textbox(label="Note (optional)")
+                sub_btn = gr.Button("Get recommendations", variant="primary")
+
+                gr.Markdown("### 2️⃣  Chat")
+                chat = gr.Chatbot()
+                user_txt = gr.Textbox(label="Your message")
+
+            # Right column -----------------------------------------------------
+            with gr.Column(scale=2, elem_id="rhs_col"):
+                gr.Markdown("### Recommendations")
+                gallery = gr.Gallery(
+                    columns=[4], allow_preview=False, elem_id="product_gallery",
+                    height="100%", show_label=False, object_fit="cover"
+                )
+
+                with gr.Group(visible=False) as detail_box:
+                    gr.Markdown("#### Product details")
+                    d_img = gr.Image()
+                    d_price = gr.HTML()
+                    gr.Button("Buy now 💳", variant="primary")
+
+        # ---- Callbacks -------------------------------------------------------
+        def _submit(img, prompt, hist):
+            prods, reply = generate_initial_recommendations(img, prompt)
+            hist = hist or []
+            hist.append((prompt or "", reply))
+            return hist, [p.image for p in prods], hist, prods, "", gr.update(visible=False)
+
+        sub_btn.click(_submit,
+            inputs=[img_in, prompt_in, chat_hist],
+            outputs=[chat, gallery, chat_hist, prod_state, prompt_in, detail_box])
+
+        def _chat(msg, hist, prods):
+            if not msg:
+                return gr.update(), gr.update(), hist, prods, "", gr.update()
+            new_p, reply = refine_recommendations(msg, hist, prods)
+            hist.append((msg, reply))
+            return hist, [p.image for p in new_p], hist, new_p, "", gr.update(visible=False)
+
+        user_txt.submit(_chat,
+            inputs=[user_txt, chat_hist, prod_state],
+            outputs=[chat, gallery, chat_hist, prod_state, user_txt, detail_box])
+
+        def _show(evt: gr.SelectData, prods: List[Product]):
+            idx = evt.index if evt else None
+            if idx is None or idx >= len(prods):
+                return gr.update(), gr.update(), gr.update(visible=False)
+            p = prods[idx]
+            return p.image, f"<h3>Price: {p.price}</h3>", gr.update(visible=True)
+
+        gallery.select(_show, inputs=[prod_state], outputs=[d_img, d_price, detail_box])
+
+    demo.queue().launch()
+
+
+if __name__ == "__main__":
+    launch_app()
