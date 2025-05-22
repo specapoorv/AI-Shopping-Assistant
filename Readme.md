@@ -16,7 +16,7 @@ Run the python script shoes_init.py
 (This converts it into the format we need for the app to run)  
 
 Create a .env file and create an entry:  
-GEMINI_API_KEY=<insert your api key here>  
+GEMINI_API_KEY=(insert your api key here) 
 
 Install all the dependencies in requirements.txt  
 
