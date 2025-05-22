@@ -84,6 +84,18 @@ def clip_find_top_k_similar_in_category(feature_dir, query_feat, k=8):
 	idxs = np.argsort(sims)[-k:][::-1]
 	return [(paths[i], float(sims[i])) for i in idxs]
 
+def encode_one_text(text: str) -> torch.Tensor:
+    # 1) Tokenize expects a list, so wrap your string in a list
+    text_tokens = clip.tokenize([text]).to(device)   # shape: [1, L]
+
+    # 2) Encode and normalize
+    with torch.no_grad():
+        text_feat = clip_model.encode_text(text_tokens)    # shape: [1, 512]
+        text_feat = text_feat / text_feat.norm(dim=-1, keepdim=True)
+
+    # 3) Remove the batch dim → shape: [512]
+    return text_feat.squeeze(0)
+
 # ---------- Example usage ----------
 if __name__ == "__main__":
     test_img = Image.open("test2.jpg")

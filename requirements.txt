@@ -11,3 +11,4 @@ python-dotenv
 torch
 numpy
 scikit-learn
+gradio

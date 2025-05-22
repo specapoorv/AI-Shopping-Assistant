@@ -1,24 +1,3 @@
-# gradio_personal_shopper_ui.py  ── v5: min-height 0 fix + 100% gallery height
-"""Gradio UI – **final layout fix** for the gallery not stretching all the way down.
-
-Root cause
-~~~~~~~~~~
-When a flex column contains a flex child *and* other siblings (our heading and
-hidden detail pane), the child must have **`min-height: 0`** (or `overflow`
-set) to be allowed to shrink/grow within the remaining space; otherwise many
-browsers keep its intrinsic height (fit-content) and the rest of the column
-shows blank.
-
-Fixes in this version
-=====================
-1. `#product_gallery` now gets `flex: 1 1 auto; min-height: 0; overflow-y: auto;`.
-2. Explicit `height="100%"` passed to `gr.Gallery` so its wrapper also expands.
-3. Slightly smaller default thumbnail size (256×256) so two rows fit on most
-   laptop screens (tweak via `item_size` if desired).
-
-No Python callback changes – just drop-in replacement.
-"""
-
 # External Packages:
 from __future__ import annotations
 import gradio as gr
@@ -30,7 +9,15 @@ from PIL import Image
 # Importing from our various other files:
 import my_clipmlp
 import llm
+myLLM = llm.MyLLMClass()
 
+LocalImg = Union[str, Image.Image]
+
+@dataclass
+class Product:
+    image: LocalImg
+    price: str
+    name: str = ""
 
 beginning_llm_prompt = """You are a friendly personal shopping assistant. You have just been shown an image of a product the user likes. 
 
@@ -41,22 +28,65 @@ beginning_llm_prompt = """You are a friendly personal shopping assistant. You ha
 
 Example output:
 “Nice choice! I see a pair of black leather ankle boots with a pointed toe and block heel. Do you have a favorite brand or heel height? Or perhaps a color or material you’d like to explore next? Let me know your budget and any style details (like casual vs. dressy), and I'll pull up some perfect matches for you!”
+
 """
 
-# -----------------------------------------------------------------------------
-# 📦  Product model
-# -----------------------------------------------------------------------------
+second_llm_prompt = """
+For the next incoming messages, you have to now follow these instructions:
+Your job on every user message:
 
-LocalImg = Union[str, Image.Image]
+1. Figure out which ONE of the following category strings best matches what the user now wants.  
+(If they haven't clearly switched, keep the category you last output.)
+Boots_Ankle
+Boots_Knee High
+Boots_Mid-Calf
+Boots_Over the Knee
+Boots_Prewalker Boots
+Sandals_Athletic
+Sandals_Flat
+Sandals_Heel
+Shoes_Boat Shoes
+Shoes_Clogs and Mules
+Shoes_Crib Shoes
+Shoes_Firstwalker
+Shoes_Flats
+Shoes_Heels
+Shoes_Loafers
+Shoes_Oxfords
+Shoes_Prewalker
+Shoes_Sneakers and Athletic Shoes
+Slippers_Boot
+Slippers_Slipper Flats
+Slippers_Slipper Heels
 
-@dataclass
-class Product:
-    image: LocalImg
-    price: str
-    name: str = ""
+
+2. Write a concise, embed-ready description of the product(s) the user wants (colour, material, heel height, brand, occasion, budget, etc.).
+
+3. **Return exactly two lines**—nothing else, no markdown:
+CATEGORY: <one category from the list>
+QUERY: <search description in 1-3 sentences>
+MESSAGE: <what you, as a friendly personal shopping assistant, would say after presenting the new set of choices. Invite them to ask further follow-up questions.>
+
+Examples (Note, I have not filled in the MESSAGE part. However, you, as a friendly shopping assistant, should fill it in as needed.)
+User: “Do you have these boots in tan?” →  
+CATEGORY: Boots_Ankle
+QUERY: tan leather ankle boots with block heel, under $150
+MESSAGE: <insert message>
+
+User: “Actually show me some flat strappy sandals for a beach wedding.” →  
+CATEGORY: Sandals_Flat
+QUERY: white or nude flat strappy sandals suitable for beach wedding
+MESSAGE: <insert message>
+
+Never add other words, greetings, or JSON. Just the two lines.
+
+Your First User Message:
+"""
+
+clip_category_prompt = "The last detected category up until this message was "
 
 # -----------------------------------------------------------------------------
-# ✨  Stub functions  – replace with real logic
+# Core Backend Calling
 # -----------------------------------------------------------------------------
 
 def generate_initial_recommendations(img_path: str | None, prompt: str | None) -> Tuple[List[Product], str]:
@@ -64,22 +94,39 @@ def generate_initial_recommendations(img_path: str | None, prompt: str | None) -
 
     clipmlp_category, clip_feat = my_clipmlp.classify_image_clipmlp(image)
     top8 = my_clipmlp.clip_find_top_k_similar_in_category(f"shoe_features\\{clipmlp_category}", clip_feat)
-
-    llm_response = llm.get_llm_response(beginning_llm_prompt, image)
-
     prods = []
     for rank, (p, sim) in enumerate(top8, start=1):
-        print(f"{rank:2d}. {os.path.basename(p)} — cosine sim: {sim:.4f}")
         product_price = "₹1,000"
         prods.append(Product(Image.open(f"shoes\\{clipmlp_category}\\{os.path.basename(p)[:-4]}.jpg"), product_price))
+    
+    myLLM.create_new_chat()
+    myLLM.clipcategory = clipmlp_category
+    llm_response = myLLM.query_chat(beginning_llm_prompt+prompt, image)
+
     return prods, llm_response
 
 
 def refine_recommendations(msg: str, hist: List[Tuple[str, str]], prods: List[Product]) -> Tuple[List[Product], str]:
-    return prods[::-1], "Re-ordered as requested."
+    if myLLM.chat_msg_count == 1:
+        llm_response = myLLM.query_chat(second_llm_prompt + msg+clip_category_prompt + myLLM.clipcategory.replace('\\','_'))
+    else:
+        llm_response = myLLM.query_chat(msg + '\n' + clip_category_prompt + myLLM.clipcategory.replace('\\','_') )
+
+    category, query, msg = myLLM.extract_data_from_followup_responses(llm_response)
+    print(category)
+    print(query)
+    myLLM.clipcategory = category
+    feat = my_clipmlp.encode_one_text(query)
+    top8 = my_clipmlp.clip_find_top_k_similar_in_category(f"shoe_features\\{category}", feat)
+    prods = []
+    for rank, (p, sim) in enumerate(top8, start=1):
+        product_price = "₹1,000"
+        prods.append(Product(Image.open(f"shoes\\{category}\\{os.path.basename(p)[:-4]}.jpg"), product_price))
+    
+    return prods, msg
 
 # -----------------------------------------------------------------------------
-# 🎨  UI
+#  UI
 # -----------------------------------------------------------------------------
 
 def launch_app():
