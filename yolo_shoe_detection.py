@@ -7,45 +7,38 @@ Original file is located at
     https://colab.research.google.com/drive/1cHgGrhfUuXspENsdw_uml087l_2N8cHU
 """
 
-!pip install ultralytics
 
 from ultralytics import YOLO
 
 # Load your trained model weights file is in the drive link given in the repo download that
 model = YOLO('/content/yolov8_finetuned_weights.pt')
+#test your image with this snippet 
+#results = model.predict(source='/content/3.webp', conf=0.5)
+#results[0].show()
 
-results = model.predict(source='/content/3.webp', conf=0.5)
-results[0].show()
-
-from ultralytics import YOLO
 import cv2
 import os
 
-# --- Setup --- for testing on an image choose any image
-image_path = "{your path here}"  # Path to your input image
-output_dir = "cropped_shoes"  # Folder to save cropped images
-os.makedirs(output_dir, exist_ok=True)
+def load_image(img_path, output_dir):
+    image_path = "img_path" 
+    img = cv2.imread(image_path)
 
-# --- Load model ---
+    os.makedirs(output_dir, exist_ok=True)
+    results = model(image_path)
+    return results, img
 
-# --- Run prediction on the image ---
-results = model(image_path)
-
-# --- Load original image using OpenCV ---
-img = cv2.imread(image_path)
-
-# --- Extract shoe bounding boxes and save crops ---
-for i, box in enumerate(results[0].boxes):
-    cls_id = int(box.cls[0])  # Class ID
-    label = model.names[cls_id]  # Class name
-
-    if label.lower() == "shoe":  # Only crop if class is 'shoe'
-        x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box
-        cropped = img[y1:y2, x1:x2]  # Crop the region
-
-        # Save the cropped image
-        filename = f"{output_dir}/shoe_{i}.jpg"
-        cv2.imwrite(filename, cropped)
-        print(f"Cropped shoe saved to: {filename}")
+def cropping_image(results, img):
+    
+    for i, box in enumerate(results[0].boxes):
+        cls_id = int(box.cls[0])  
+        label = model.names[cls_id]  
+    
+        if label.lower() == "shoe":  # Only crop if class is 'shoe'
+            x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box
+            cropped = img[y1:y2, x1:x2]  # Crop the region
+    
+            filename = f"{output_dir}/shoe_{i}.jpg"
+            cv2.imwrite(filename, cropped)
+            print(f"Cropped shoe saved to: {filename}")
 
 
