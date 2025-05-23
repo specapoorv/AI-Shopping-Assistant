@@ -11,8 +11,8 @@ Original file is located at
 
 from ultralytics import YOLO
 
-# Load your trained model
-model = YOLO('/content/best.pt')
+# Load your trained model weights file is in the drive link given in the repo download that
+model = YOLO('/content/yolov8_finetuned_weights.pt')
 
 results = model.predict(source='/content/3.webp', conf=0.5)
 results[0].show()
@@ -21,8 +21,8 @@ from ultralytics import YOLO
 import cv2
 import os
 
-# --- Setup ---
-image_path = "/content/3.webp"  # Path to your input image
+# --- Setup --- for testing on an image choose any image
+image_path = "{your path here}"  # Path to your input image
 output_dir = "cropped_shoes"  # Folder to save cropped images
 os.makedirs(output_dir, exist_ok=True)
 
@@ -48,11 +48,4 @@ for i, box in enumerate(results[0].boxes):
         cv2.imwrite(filename, cropped)
         print(f"Cropped shoe saved to: {filename}")
 
-from PIL import Image
-
-# Load the image
-img = Image.open("/content/cropped_shoes/shoe_1.jpg")
-
-# Display the image
-img.show()
 
