@@ -7,36 +7,34 @@ Original file is located at
     https://colab.research.google.com/drive/1cHgGrhfUuXspENsdw_uml087l_2N8cHU
 """
 
-
 from ultralytics import YOLO
-
-# Load your trained model weights file is in the drive link given in the repo download that
-model = YOLO('yolov8_finetuned_weights.pt')
-#test your image with this snippet 
-#results = model.predict(source='/content/3.webp', conf=0.5)
-#results[0].show()
-
 import cv2
 import os
 
-def load_image(img_path, output_dir):
+def load_image(img_path, weight_path):
     img = cv2.imread(img_path)
-
-    os.makedirs(output_dir, exist_ok=True)
-    results = model(img_path)
+    model = YOLO(weight_path)
+    results = model(img_path, conf=0.5) #using threshold 0.5 for now 
     return results, img
 
-def cropping_image(results, img):
-    
-    for i, box in enumerate(results[0].boxes):
-        cls_id = int(box.cls[0])  
-        label = model.names[cls_id]  
-    
-        if label.lower() == "shoe":  # Only crop if class is 'shoe'
-            x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box
-            cropped = img[y1:y2, x1:x2]  # Crop the region
-    
-            filename = f"{output_dir}/shoe_{i}.jpg"
-            cv2.imwrite(filename, cropped)
-            print(f"Cropped shoe saved to: {filename}")
+def cropping_image(results, img, output_dir):
+    boxes = results[0].boxes
+    os.makedirs(output_dir, exist_ok=True)
+
+
+    if boxes is None or len(boxes) == 0:
+        # No object detected — save original image
+        warning_path = f"{output_dir}/no_detection.jpg"
+        cv2.imwrite(warning_path, img)
+        print(f"⚠️ No objects detected. Saved original image as: {warning_path}")
+        return
+
+    # Iterate and crop all detected objects
+    for i, box in enumerate(boxes):
+        x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box
+        cropped = img[y1:y2, x1:x2]
+
+        filename = f"{output_dir}/cropped_{i}.jpg"
+        cv2.imwrite(filename, cropped)
+        print(f"✅ Cropped object saved to: {filename}")
 
