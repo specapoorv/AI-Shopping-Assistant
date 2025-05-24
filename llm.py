@@ -13,6 +13,7 @@ class MyLLMClass():
 		self.chat = None
 		self.chat_msg_count = None
 		self.clipcategory = None
+		self.preferences = ''
 
 	def get_single_llm_response(self, query, image=None):
 		if image is None:
@@ -35,11 +36,12 @@ class MyLLMClass():
 		return response.text
 
 	def extract_data_from_followup_responses(self, text):
-		category, query, pricerange, brand, msg = text.strip().splitlines()[:5]
+		category, query, pricerange, brand, preferences, msg = text.strip().splitlines()[:6]
 		category = category.split("CATEGORY:")[1].strip()
 		query = query.split("QUERY:")[1].strip()
 		pricerange = pricerange.split("BUDGET:")[1].strip()
 		brand = brand.split("BRAND:")[1].strip()
+		preferences = preferences.split("PREFERENCES:")[1].strip()
 		msg = msg.split("MESSAGE:")[1].strip()
 
 		category = category.replace('_','\\')
@@ -58,7 +60,7 @@ class MyLLMClass():
 		else:
 			brand = brand.lower()
 
-		return category, query, pricerange, brand, msg
+		return category, query, pricerange, brand, preferences, msg
 
 
 
@@ -103,23 +105,28 @@ Slippers_Slipper Flats
 Slippers_Slipper Heels
 
 
-2. Write a concise, embed-ready description of the product(s) the user wants (colour, material, heel height, brand, occasion, budget, etc.).
+2. Write a concise, embed-ready query of the product(s) the user wants (colour, material, heel height, brand, occasion, budget, etc.).
+This query will be passed on to an unintelligent similarity scores. So if you say something like, "Green shoes that look similar to the previous Red Nike Shoes",
+then the unintelligent agent will not understand. Instead you should something like "Green sneakers or sports shoes" etc. where you don't refer the previous image and you don't confuse the unintelligent agent with multiple colours, textures etc. Also, don't tell put things the user doesn't like. Only mention things they like.
+It is your responsibility to understand what the user wants, and precisely convey that to the unintelligent agent. If the user doesn't specify which colour they want, or says that they don't like the current colour, recommend colours from their preferences.
 
-3. **Return exactly two lines**—nothing else, no markdown:
+3. **Return exactly six lines**—nothing else, no markdown:
 CATEGORY: <one category from the list>
-QUERY: <search description in 1-3 sentences>
-BUDGET: <semicolon separated values for upper and lower bounds, both in Indian Rupees (1 us dollar = 85 indian rupees). If not specified, simply output None>
+QUERY: <query in 1-3 sentences>
+BUDGET: <semicolon separated values for upper and lower bounds, both in Indian Rupees (1 us dollar = 85 indian rupees. If units are not mentioned, assume the user meant indian rupees). If not specified, simply output None. If a min price is given, you can output (that min price; 100000). If a max price is given, you can output (0; that max price)>
 BRAND: <brand name. If bot specified, simply output None>
+PREFERENCES: <any personal preferences the user gave away uptil now in his messages. You can also assume the user prefers things he has uploaded in all the pictures so far.>
 MESSAGE: <what you, as a friendly personal shopping assistant, would say after presenting the new set of choices. Invite them to ask further follow-up questions.>
 
 Here is an example conversation (Note, I have not filled in the MESSAGE part. However, you, as a friendly shopping assistant, should fill it in as needed.)
 As a personal shopping assistant, you will remember key details about the user's past messages.
 
-User: “Do you have these boots in tan?” →  
+User: “Do you have these boots in tan? I like the colour tan.” →  
 CATEGORY: Boots_Ankle
 QUERY: tan leather ankle boots with block heel
 BUDGET: None
 BRAND: None
+PREFERENCES: likes tan
 MESSAGE: <insert message>
 
 User: “Actually show me some flat strappy sandals under 1000” →  
@@ -127,6 +134,7 @@ CATEGORY: Sandals_Flat
 QUERY: white or nude flat strappy sandals
 BUDGET: 0; 1000
 BRAND: None
+PREFERENCES: likes tan
 MESSAGE: <insert message>
 
 User: “Do you have adidas?” →  
@@ -134,11 +142,13 @@ CATEGORY: Sandals_Flat
 QUERY: white or nude flat strappy sandals
 BUDGET: 0; 1000
 BRAND: Adidas
+PREFERENCES: likes tan
 MESSAGE: <insert message>
 
-Never add other words, greetings, or JSON. Just the five lines.
+Never add other words, greetings, or JSON. Just the six lines.
 
 Your First User Message:
 """
 
 clip_category_prompt = "The last detected category up until this message was "
+clip_preferences_prompt = "The user had expressed the following general preferences in the past: "

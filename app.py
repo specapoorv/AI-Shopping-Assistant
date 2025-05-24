@@ -8,8 +8,9 @@ from PIL import Image
 
 # Importing from our various other files:
 import my_clipmlp
+import yolo_shoe_detection
 import llm
-from llm import beginning_llm_prompt, second_llm_prompt, clip_category_prompt
+from llm import beginning_llm_prompt, second_llm_prompt, clip_category_prompt, clip_preferences_prompt
 myLLM = llm.MyLLMClass()
 
 LocalImg = Union[str, Image.Image]
@@ -27,16 +28,44 @@ class Product:
 
 def generate_initial_recommendations(img_path: str | None) -> Tuple[List[Product], str]:
     image = Image.open(img_path).copy()
+    cropped_images = yolo_shoe_detection.get_yolo_cropped_images(image)
 
-    clipmlp_category, clip_feat = my_clipmlp.classify_image_clipmlp(image)
-    top8 = my_clipmlp.clip_find_top_k_similar_in_category(clipmlp_category, clip_feat, None, None)
-    prods = []
+    # Instance-Aware Retrieval Distributor
+    top8 = []
+    already_suggested_names = set()
+    other_possibilities = []
+    base, rem = divmod(8, len(cropped_images)) 
+    for i, img in enumerate(cropped_images):
+        k = base + (1 if i < rem else 0)
+        clipmlp_category, clip_feat = my_clipmlp.classify_image_clipmlp(image)
+        j = 0
+        for possibility in my_clipmlp.clip_find_top_k_similar_in_category(clipmlp_category, clip_feat, None, None):
+            if j < k:
+                name, sim, feat = possibility
+                if name not in already_suggested_names:
+                    already_suggested_names.add(name)
+                    top8.append(possibility)
+            else:
+                other_possibilities.append(possibility)
+            j += 1
+            if j == 8:
+                break
+        for possibility in other_possibilities:
+            name, sim, feat = possibility
+            if name not in already_suggested_names:
+                already_suggested_names.add(name)
+                top8.append(possibility)
+            j += 1
+            if j == 8:
+                break
+
 
     # Contrastive Re-Ranking to order best fit data according to the LLM's attribute understanding
     myLLM.create_new_chat()
     llm_response = myLLM.query_chat(beginning_llm_prompt, image)
     top8 = my_clipmlp.contrastive_reranking(top8, llm_response)
 
+    prods = []
     for rank, (p, sim, feat) in enumerate(top8, start=1):
         product_file_name = os.path.basename(p)[:-4] + '.jpg'
         product_price = f"₹{my_clipmlp.brand_mapping[clipmlp_category.replace('\\','_')][product_file_name][1]}"
@@ -53,16 +82,19 @@ def generate_initial_recommendations(img_path: str | None) -> Tuple[List[Product
 
 def refine_recommendations(msg: str, hist: List[Tuple[str, str]], prods: List[Product]) -> Tuple[List[Product], str]:
     if myLLM.chat_msg_count == 1:
-        llm_response = myLLM.query_chat(second_llm_prompt + msg + clip_category_prompt + myLLM.clipcategory.replace('\\','_'))
+        llm_response = myLLM.query_chat(second_llm_prompt + msg + clip_category_prompt + myLLM.clipcategory.replace('\\','_')
+        + clip_preferences_prompt + myLLM.preferences)
     else:
-        llm_response = myLLM.query_chat(msg + '\n' + clip_category_prompt + myLLM.clipcategory.replace('\\','_') )
+        llm_response = myLLM.query_chat(msg + '\n' + clip_category_prompt + myLLM.clipcategory.replace('\\','_') 
+        + clip_preferences_prompt + myLLM.preferences)
 
-    category, query, pricerange, brand, msg = myLLM.extract_data_from_followup_responses(llm_response)
+    category, query, pricerange, brand, preferences, msg = myLLM.extract_data_from_followup_responses(llm_response)
     print('-------Data retrieved from user msg-------')
     print(category)
     print(query)
     print(pricerange)
     print(brand)
+    print(myLLM.preferences + ' ' + preferences)
     print('--------------')
     feat = my_clipmlp.encode_one_text(query)
     top8 = my_clipmlp.clip_find_top_k_similar_in_category(category, feat, pricerange, brand)
@@ -70,6 +102,7 @@ def refine_recommendations(msg: str, hist: List[Tuple[str, str]], prods: List[Pr
     myLLM.last_clip_feat = feat
     myLLM.last_pricerange = pricerange
     myLLM.last_brand = brand
+    myLLM.preferences = myLLM.preferences + ' ' + preferences
     myLLM.retrieved_feats = [tup[2] for tup in top8]
 
     prods = []

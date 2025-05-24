@@ -113,7 +113,7 @@ def contrastive_reranking(top_k_items, llm_context):
     if not top_k_items:
         return []
 
-    embedded_context_for_contrastive_reranking = encode_one_text(llm_context.strip().splitlines()[0])
+    embedded_context_for_contrastive_reranking = encode_one_text(llm_context[:50])
 
     feats = np.stack([it[2] for it in top_k_items], axis=0)
     feats = feats / (np.linalg.norm(feats,  axis=1, keepdims=True) + 1e-12)
