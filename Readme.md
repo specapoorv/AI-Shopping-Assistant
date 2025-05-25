@@ -4,6 +4,9 @@ This project is an attempt at Theme-1 of the Appian AIgnite Hackathon, Round 2.
 It is an AI-Powered Personal Shopping Assistant for E-Commerce proof-of-concept on a footwear-only dataset.  
 
 
+## Demo Trailer
+[!(https://raw.githubusercontent.com/Madhav-AK/AI-Shopping-Assistant/main/demo_trailer.mp4]
+
 # Setup Instructions
 
 Please use a device running Windows  
