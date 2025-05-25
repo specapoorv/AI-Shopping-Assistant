@@ -5,7 +5,7 @@ It is an AI-Powered Personal Shopping Assistant for E-Commerce proof-of-concept 
 
 
 ## Demo Trailer
-[![Watch on YouTube](thumbnail.jpg)](https://youtu.be/9WwNbp5zoGc)
+[![Watch on YouTube](thumbnail2.jpg)](https://youtu.be/9WwNbp5zoGc)
 
 # Setup Instructions
 
