@@ -23,7 +23,6 @@ class Product:
     name: str = ""
 
 N = 100
-p = 0.3
 
 # -----------------------------------------------------------------------------
 # Core Backend Calling
@@ -135,7 +134,7 @@ def refine_recommendations(msg: str, hist: List[Tuple[str, str]], prods: List[Pr
 
 def recommend_less(idx, prods):
     prod_selected_name = prods[idx].name
-    myLLM.last_clip_feat = (1-p)*np.array(myLLM.last_clip_feat) + p*np.array(myLLM.retrieved_feats[idx])
+    myLLM.last_clip_feat = 0.7*np.asarray(myLLM.last_clip_feat) + 0.3*np.asarray(myLLM.retrieved_feats[idx])
     category = myLLM.clipcategory
     feat = myLLM.last_clip_feat
     pricerange = myLLM.last_pricerange
@@ -151,7 +150,7 @@ def recommend_less(idx, prods):
 
 def recommend_more(idx, prods):
     prod_selected_name = prods[idx].name
-    myLLM.last_clip_feat = (1+p)*np.array(myLLM.last_clip_feat) - p*np.array(myLLM.retrieved_feats[idx])
+    myLLM.last_clip_feat = 1.3*np.asarray(myLLM.last_clip_feat) - 0.3*np.asarray(myLLM.retrieved_feats[idx])
     category = myLLM.clipcategory
     feat = myLLM.last_clip_feat
     pricerange = myLLM.last_pricerange
