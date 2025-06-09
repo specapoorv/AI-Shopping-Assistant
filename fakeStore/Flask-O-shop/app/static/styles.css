@@ -1,0 +1,175 @@
+:root {
+	--primary: #007bff;
+	--success: #28a745;
+	--danger: #dc3545;
+	--light-gray: #f8f9fa;
+	--shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+	--font-main: 'Segoe UI', sans-serif;
+}
+
+body {
+	font-family: var(--font-main);
+	background-color: var(--light-gray);
+	margin: 0;
+	padding: 0;
+}
+
+.main {
+	padding: 10vh 0;
+}
+
+a {
+	text-decoration: none;
+	color: var(--primary);
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+/* Navbar */
+.navbar {
+	padding: 1rem 6rem;
+	background: white;
+	box-shadow: var(--shadow);
+	position: sticky;
+	top: 0;
+	z-index: 10;
+}
+
+/* Footer */
+footer {
+	box-shadow: var(--shadow);
+	background: white;
+	padding: 1rem;
+	text-align: center;
+	font-size: 0.9rem;
+}
+
+/* Flash messages and forms */
+.forms, .flash-error, .success {
+	margin: 0 auto;
+	max-width: 450px;
+	padding: 10px;
+	border-radius: 5px;
+	background: white;
+	box-shadow: var(--shadow);
+}
+
+.flash-error {
+	color: var(--danger);
+	font-weight: bold;
+	text-align: center;
+}
+
+.success {
+	color: var(--success);
+	font-weight: bold;
+	text-align: center;
+}
+
+/* Items container */
+.items {
+	max-width: 1000px;
+	margin: 2rem auto;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 40px;
+	justify-content: center;
+}
+
+/* Item card */
+.item {
+	width: 260px;
+	background: white;
+	padding: 15px;
+	border-radius: 10px;
+	box-shadow: var(--shadow);
+	transition: all 0.3s ease-in-out;
+}
+
+.item:hover {
+	transform: translateY(-5px);
+	box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+}
+
+/* Image styling */
+.img-wrapper {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin-bottom: 15px;
+}
+
+.pic {
+	width: 180px;
+	height: 180px;
+	object-fit: cover;
+	border-radius: 8px;
+}
+
+/* Buttons */
+.add-to-cart, .remove-from-cart, .checkout {
+	width: 100%;
+	border: none;
+	color: white;
+	padding: 10px;
+	border-radius: 6px;
+	font-weight: bold;
+	cursor: pointer;
+	transition: background 0.2s ease;
+}
+
+.add-to-cart {
+	background-color: var(--success);
+}
+
+.remove-from-cart {
+	background-color: var(--danger);
+}
+
+.checkout {
+	background-color: var(--primary);
+}
+
+/* Cart / price display */
+.right-item {
+	float: right;
+	color: var(--success);
+	font-weight: bold;
+}
+
+.check {
+	max-width: 350px;
+	margin: 3rem auto;
+	padding: 1rem;
+	background: white;
+	box-shadow: var(--shadow);
+	border-radius: 8px;
+	text-align: center;
+	font-size: 1.1rem;
+	font-weight: bold;
+}
+
+/* Details area */
+.details {
+	padding: 1rem 0;
+}
+
+/* Star styling */
+.checked {
+	color: orange;
+}
+
+/* Responsive tweaks */
+@media only screen and (max-width: 600px) {
+	.navbar {
+		padding: 1rem;
+	}
+	.items {
+		gap: 20px;
+	}
+	.item {
+		width: 90%;
+	}
+}

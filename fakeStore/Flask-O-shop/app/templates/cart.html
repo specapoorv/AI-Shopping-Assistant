@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}
+	Cart - Flask-O-shop
+{% endblock %}
+
+<script src="https://js.stripe.com/v3/"></script>
+
+{% block content %}
+	{% with msgs =  get_flashed_messages(with_categories=True) %}
+	{% for c, msg in msgs %}
+		{% if c == 'error' %}
+			<div class="flash-error">
+		{% else %}
+			<div class="success">
+		{% endif %}
+			{{ msg | safe }}</div><br>
+	{% endfor %}
+	{% endwith %}
+
+	{% if not items %}
+		<div class="flash-error">
+			Cart is empty!<br>
+			<a href="{{ url_for('home') }}">Discover new items</a>
+		</div>
+	{% else %}
+		<a href="{{ url_for('home') }}" class="right-item">Add more items</a><br><br>
+	{% endif %}
+
+	<div class="items">
+	{% for i in range(items|length) %}
+    <div class="item">
+		<div class="item-wrapper">
+			<div class="img-wrapper">
+				<img src="{{ items[i].image_path }}" class="pic">
+			</div>
+			<b>{{ items[i].brand }}</b>
+			<span class="right-item">${{ items[i].price }}</span><br>
+			Quantity: 
+			<span class="right-item">{{ quantity[i] }}</span><br>
+			Total:
+			<span class="right-item">₹{{ quantity[i]*items[i].price_cents * 0.89 }}</span>
+			<br><br>
+			<a href="{{ url_for('remove', id=items[i].id, quantity=quantity[i]) }}">
+				<button class="remove-from-cart"> Remove from Cart </button>
+			</a>
+		</div>
+	</div>
+    {% endfor %}
+	</div>
+
+	{% if price %}
+	<div class="check">
+		<form id="checkout-form" method="POST" action="{{ url_for('create_checkout_session') }}">
+			<input type="hidden" name="price_ids" id="cart_data" value="">
+			Grand Total: ₹{{ '%.2f' % (price * 0.892214) }}  
+			<small class="text-muted">(Note: Final amount may slightly vary based on live USD-INR rates used by Stripe.)</small><br><br>
+			<button type="submit" class="bg-success btn-block btn-primary checkout"> Checkout </button>
+		</form>
+	</div>
+	{% endif %}
+<script>
+	document.getElementById('checkout-form').addEventListener('submit', function(e) {
+		e.preventDefault();
+
+		const items = [
+			{% for i in range(items|length) %}
+			{
+				id: {{ items[i].id }},
+				quantity: {{ quantity[i] }}
+			}{% if not loop.last %},{% endif %}
+			{% endfor %}
+		];
+
+		document.getElementById('cart_data').value = JSON.stringify(items);
+
+		// Show the loading overlay
+		document.getElementById('loading-overlay').style.display = 'flex';
+
+		// Actually submit the form
+		this.submit();
+	});
+</script>
+
+{% endblock %}
